@@ -16,10 +16,8 @@
 #include "led.h"
 #include "uart1.h"
 #include "uart2.h"
-//#include "can1.h"
 #include "platform.h"
-//#include "udpserver.h"
-//#include "imu.h"
+#include "control.h"
 #include "system.h"
 
 static const TickType_t SYS_UPDATE_FREQ = M2T(1000);
@@ -94,13 +92,9 @@ static void system_task(
 
     uart1_init(UART1_BAUDRATE);
 
-    //can1_init();
-
     system_init();
 
-    //udpserver_start();
-
-    //imu_start();
+    control_start();
 
     signal_ready_to_start();
 
@@ -111,7 +105,6 @@ static void system_task(
         vTaskDelayUntil(&last_wake_time, SYS_UPDATE_FREQ);
 
         led_toggle(LED_SYSTEM_STATUS);
-        led_off(LED_UART2_STATUS);
 
 #ifdef BUILD_TYPE_DEBUG
         debug_output_runtime_stats();
