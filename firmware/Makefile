@@ -25,10 +25,11 @@ CSOURCES+=$(shell find -L $(SRCDIR) -name '*.c')
 
 # Find header directories for the project (not the vendor packages)
 INC=$(shell find -L . -path ./include/vendor -prune -o -path ./src/vendor -prune -o -name '*.h' -exec dirname {} \; | uniq)
+INCLUDES:=$(INC:%=-I%)
 # Add vendor include directories
-INC+=$(shell find -L ./include/vendor -name '*.h' -exec dirname {} \; | uniq)
+INC=$(shell find -L ./include/vendor -name '*.h' -exec dirname {} \; | uniq)
 INC+=$(shell find -L ./src/vendor -name '*.h' -exec dirname {} \; | uniq)
-INCLUDES=$(INC:%=-I%)
+INCLUDES+=$(INC:%=-isystem%)
 
 # Create object list
 OBJECTS=$(ASOURCES:%.s=%.o)
@@ -46,6 +47,7 @@ DEFS=-DARM_MATH_CM7 -DUSE_HAL_DRIVER
 DEFS+=-DSTM32F767xx -DSTM32F7XX -DSTM32F7_NUCLEO -DUSE_FULL_LL_DRIVER
 CFLAGS=-c $(MCFLAGS)
 CFLAGS+=-std=gnu99 -Wall -Wextra -Wimplicit-function-declaration -Wstrict-prototypes -Wundef -Wshadow
+CFLAGS+=-Werror
 CFLAGS+=$(DEFS) $(INCLUDES)
 # LINKER FLAGS
 LDSCRIPT_DEBUG=linker/stm32f7_link.ld
