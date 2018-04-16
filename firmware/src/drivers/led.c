@@ -10,7 +10,7 @@
 #include "stm32f7xx_ll_bus.h"
 #include "stm32f7xx_ll_rcc.h"
 #include "stm32f7xx_ll_gpio.h"
-#include "debugio.h"
+#include "debug.h"
 #include "led.h"
 
 static bool is_init = false;

@@ -15,7 +15,7 @@
 #include "FreeRTOS.h"
 #include "queue.h"
 #include "nvicconf.h"
-#include "debugio.h"
+#include "debug.h"
 #include "uart2.h"
 
 static StaticQueue_t rx_queue_handle;

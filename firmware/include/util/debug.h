@@ -1,11 +1,11 @@
 /**
- * @file debugio.h
+ * @file debug.h
  * @brief TODO.
  *
  */
 
-#ifndef DEBUGIO_H
-#define DEBUGIO_H
+#ifndef DEBUG_H
+#define DEBUG_H
 
 #ifdef BUILD_TYPE_DEBUG
     #include <stdio.h>
@@ -22,4 +22,4 @@
     #define debug_printf(f, ...)
 #endif
 
-#endif /* DEBUGIO_H */
+#endif /* DEBUG_H */

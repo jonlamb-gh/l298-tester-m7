@@ -9,7 +9,7 @@
 #include "stm32f7xx_hal.h"
 #include "FreeRTOS.h"
 #include "task.h"
-#include "debugio.h"
+#include "debug.h"
 #include "led.h"
 #include "platform.h"
 

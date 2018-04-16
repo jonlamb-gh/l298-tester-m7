@@ -12,7 +12,7 @@
 #include "semphr.h"
 #include "config.h"
 #include "nvicconf.h"
-#include "debugio.h"
+#include "debug.h"
 #include "led.h"
 #include "uart1.h"
 #include "uart2.h"
@@ -83,7 +83,8 @@ static void debug_output_runtime_stats(void)
 }
 #endif
 
-static void system_task(void *params)
+static void system_task(
+        void * const params)
 {
     (void) params;
     TickType_t last_wake_time;
