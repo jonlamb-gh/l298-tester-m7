@@ -14,7 +14,7 @@
 // task stack sizes
 #define IDLE_TASK_STACKSIZE (3 * configMINIMAL_STACK_SIZE)
 #define SYSTEM_TASK_STACKSIZE (2 * configMINIMAL_STACK_SIZE)
-#define CONTROL_TASK_STACKSIZE (4 * configMINIMAL_STACK_SIZE)
+#define CONTROL_TASK_STACKSIZE (5 * configMINIMAL_STACK_SIZE)
 
 // task names
 #define SYSTEM_TASK_NAME "SYS"

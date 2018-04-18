@@ -1,11 +1,17 @@
 # l298-tester-m7
 l298-tester running on STM32F7
 
+## TODO
+
+- implement HAL MSP init/deinit functions for ADC/TIM/PWM, etc
+
 ## Debugging
 
 ```
 make debug
 ```
+
+Not used currently:
 
 ```
 make st-semihost
