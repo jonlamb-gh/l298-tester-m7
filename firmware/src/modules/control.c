@@ -29,8 +29,10 @@ static bool is_init = false;
 
 static TIM_HandleTypeDef timer_handle;
 static TIM_OC_InitTypeDef timer_oc_config;
-static uint32_t timer_period;
-static uint32_t timer_duty_ccr;
+
+// don't really need these, stored in ^^^
+//static uint32_t timer_period;
+//static uint32_t timer_duty_ccr;
 
 static void init_gpio(void)
 {
@@ -49,10 +51,11 @@ static void init_gpio(void)
     HAL_GPIO_Init(TIM3_GPIO_CHANNEL3_PORT, &gpio_init);
 }
 
-static void init_timer(void)
+static void init_timer(
+        const uint32_t period)
 {
     timer_handle.Instance = TIM3;
-    timer_handle.Init.Period = timer_period;
+    timer_handle.Init.Period = period;
     timer_handle.Init.RepetitionCounter = 0;
     timer_handle.Init.Prescaler = 0;
     timer_handle.Init.ClockDivision = 0;
@@ -65,11 +68,12 @@ static void init_timer(void)
     }
 }
 
-static void init_pwm(void)
+static void init_pwm(
+        const uint32_t duty_ccr)
 {
     timer_oc_config.OCMode = TIM_OCMODE_PWM1;
     timer_oc_config.OCPolarity = TIM_OCPOLARITY_HIGH;
-    timer_oc_config.Pulse = timer_duty_ccr;
+    timer_oc_config.Pulse = duty_ccr;
     timer_oc_config.OCNPolarity = TIM_OCNPOLARITY_HIGH;
     timer_oc_config.OCFastMode = TIM_OCFAST_DISABLE;
     timer_oc_config.OCIdleState = TIM_OCIDLESTATE_RESET;
@@ -90,15 +94,15 @@ static void pwm_enable(
     debug_printf("  freq %lu\r\n", freq);
     debug_printf("  duty %lu\r\n", duty);
 
-    timer_period = (uint32_t) (((SystemCoreClock/2) / freq) - 1);
-    timer_duty_ccr = (uint32_t) ((duty * (timer_period - 1)) / 100);
+    const uint32_t timer_period = (uint32_t) (((SystemCoreClock/2) / freq) - 1);
+    const uint32_t timer_duty_ccr = (uint32_t) ((duty * (timer_period - 1)) / 100);
 
     debug_printf("  timer_period %lu\r\n", timer_period);
     debug_printf("  timer_duty_ccr %lu\r\n", timer_duty_ccr);
 
-    init_timer();
+    init_timer(timer_period);
 
-    init_pwm();
+    init_pwm(timer_duty_ccr);
 
     if(HAL_TIM_PWM_Start(&timer_handle, TIM_CHANNEL_3) != HAL_OK)
     {
@@ -126,9 +130,6 @@ static void control_task(
 
     debug_puts(CONTROL_TASK_NAME" started");
 
-    timer_period = 0;
-    timer_duty_ccr = 0;
-
     init_gpio();
 
     //init_timer();
@@ -140,7 +141,8 @@ static void control_task(
     // 50% duty cycle
     //timer_duty_ccr = (uint32_t) (((uint32_t) 50 * (timer_period - 1)) / 100);
     // TODO - figure out the use case, make this better, what are the limits on freq?
-    pwm_enable(17570, 20);
+    //pwm_enable(17570, 20);
+    uint8_t pwm_state = 0;
 
     TickType_t last_wake_time = xTaskGetTickCount();
 
@@ -149,6 +151,17 @@ static void control_task(
         vTaskDelayUntil(&last_wake_time, M2T(500));
 
         led_toggle(LED_BLUE);
+
+        if(pwm_state == 0)
+        {
+            pwm_enable(17570, 20);
+        }
+        else
+        {
+            pwm_disable();
+        }
+
+        pwm_state = !pwm_state;
     }
 
     // should not get here
