@@ -30,10 +30,6 @@ static bool is_init = false;
 static TIM_HandleTypeDef timer_handle;
 static TIM_OC_InitTypeDef timer_oc_config;
 
-// don't really need these, stored in ^^^
-//static uint32_t timer_period;
-//static uint32_t timer_duty_ccr;
-
 static void init_gpio(void)
 {
     GPIO_InitTypeDef gpio_init;

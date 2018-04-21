@@ -18,6 +18,7 @@
 #include "uart2.h"
 #include "platform.h"
 #include "control.h"
+#include "control_io.h"
 #include "system.h"
 
 static const TickType_t SYS_UPDATE_FREQ = M2T(1000);
@@ -95,6 +96,8 @@ static void system_task(
     system_init();
 
     control_start();
+
+    control_io_start();
 
     signal_ready_to_start();
 
