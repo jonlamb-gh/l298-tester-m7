@@ -143,6 +143,8 @@ void platform_init(void)
 
 void platform_error_handler(void)
 {
+    debug_printf("!!! entering platfrom error handler !!!\r\n");
+
     while(1)
     {
         led_set_all(true);

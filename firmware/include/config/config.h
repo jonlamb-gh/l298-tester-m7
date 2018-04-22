@@ -7,10 +7,10 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-// task priorities, higher number == higher priority
-#define SYSTEM_TASK_PRI (2)
-#define CONTROL_TASK_PRI (5)
-#define CONTROL_IO_INPUT_TASK_PRI (4)
+// task priorities, higher number == higher priority (1-5)
+#define SYSTEM_TASK_PRI (5)
+#define CONTROL_TASK_PRI (4)
+#define CONTROL_IO_INPUT_TASK_PRI (3)
 
 // task stack sizes
 #define IDLE_TASK_STACKSIZE (3 * configMINIMAL_STACK_SIZE)
