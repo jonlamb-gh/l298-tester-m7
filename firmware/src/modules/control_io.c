@@ -45,23 +45,6 @@ static volatile uint32_t adc_samples[2];
 
 static bool is_init = false;
 
-void ADC_DMA_IRQHandler(void)
-{
-    //HAL_DMA_IRQHandler(&dma_handle);
-    HAL_DMA_IRQHandler(adc_handle.DMA_Handle);
-}
-
-void ADC_IRQHandler(void)
-{
-    HAL_ADC_IRQHandler(&adc_handle);
-}
-
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *handle)
-{
-    (void) handle;
-    // TODO
-}
-
 static void init_rcc(void)
 {
     __HAL_RCC_ADC1_CLK_ENABLE();
@@ -172,6 +155,15 @@ static void enable_adc(void)
     }
 }
 
+// called from IRQ
+static void adc_conversion_complete(void)
+{
+    // TODO
+    // - inline
+    // - enqueue a sample
+    // in task loop dequeue and filter?
+}
+
 static void input_task(
         void * const params)
 {
@@ -224,4 +216,23 @@ static void control_io_init(void)
 void control_io_start(void)
 {
     control_io_init();
+}
+
+// these are STM HAL related
+void ADC_DMA_IRQHandler(void)
+{
+    //HAL_DMA_IRQHandler(&dma_handle);
+    HAL_DMA_IRQHandler(adc_handle.DMA_Handle);
+}
+
+void ADC_IRQHandler(void)
+{
+    HAL_ADC_IRQHandler(&adc_handle);
+}
+
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *handle)
+{
+    (void) handle;
+
+    adc_conversion_complete();
 }
