@@ -4,17 +4,23 @@
  *
  */
 
+#include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include "stm32f7xx_hal.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "queue.h"
 #include "config.h"
 #include "nvicconf.h"
 #include "debug.h"
 #include "platform.h"
 #include "system.h"
 #include "control_io.h"
+
+#define ADC_SAMLES_LENGTH (2)
+#define ADC_QUEUE_LENGTH (64)
+#define ADC_MSG_SIZE (sizeof(adc_msg_s))
 
 // PC0/ADC123_IN10 on CN9 pin 3
 #define PT0_ADC_CHANNEL_PIN GPIO_PIN_0
@@ -27,7 +33,6 @@
 #define PT1_ADC_CHANNEL ADC_CHANNEL_13
 
 #define ADC_SAMPLE_TIME ADC_SAMPLETIME_480CYCLES
-//#define ADC_SAMPLE_TIME ADC_SAMPLETIME_3CYCLES
 
 #define ADC_DMA_CHANNEL DMA_CHANNEL_0
 #define ADC_DMA_STREAM DMA2_Stream0
@@ -35,13 +40,22 @@
 #define ADC_DMA_IRQ DMA2_Stream0_IRQn
 #define ADC_DMA_IRQHandler DMA2_Stream0_IRQHandler
 
+typedef struct
+{
+    uint32_t samples[ADC_SAMLES_LENGTH];
+} adc_msg_s;
+
 static StaticTask_t input_task_tcb;
 static StackType_t input_task_stack[CONTROL_IO_INPUT_TASK_STACKSIZE];
 
 static ADC_HandleTypeDef adc_handle;
 static DMA_HandleTypeDef dma_handle;
 
-static volatile uint32_t adc_samples[2];
+static StaticQueue_t adc_queue_handle;
+static uint8_t adc_queue_storage[ADC_QUEUE_LENGTH * ADC_MSG_SIZE];
+static QueueHandle_t adc_queue;
+
+static volatile adc_msg_s dma_adc_data;
 
 static bool is_init = false;
 
@@ -90,7 +104,6 @@ static void init_dma(void)
 
     __HAL_LINKDMA(&adc_handle, DMA_Handle, dma_handle);
 
-    //HAL_NVIC_SetPriority(ADC_DMA_IRQ, 0, 0);
     NVIC_SetPriority(ADC_DMA_IRQ, NVIC_ADC_DMA_PRI);
     HAL_NVIC_EnableIRQ(ADC_DMA_IRQ);
 }
@@ -116,10 +129,9 @@ static void init_adc(void)
     adc_handle.Init.DiscontinuousConvMode = DISABLE;
     adc_handle.Init.NbrOfDiscConversion = 0;
     adc_handle.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-    //adc_handle.Init.ExternalTrigConv = ADC_SOFTWARE_START;
     adc_handle.Init.ExternalTrigConv = ADC_EXTERNALTRIGCONV_T1_CC1;
     adc_handle.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-    adc_handle.Init.NbrOfConversion = 2;
+    adc_handle.Init.NbrOfConversion = ADC_SAMLES_LENGTH;
     adc_handle.Init.DMAContinuousRequests = ENABLE;
     adc_handle.Init.EOCSelection = DISABLE;
 
@@ -149,24 +161,39 @@ static void init_adc(void)
 
 static void enable_adc(void)
 {
-    if(HAL_ADC_Start_DMA(&adc_handle, (uint32_t*) &adc_samples[0], 2) != HAL_OK)
+    const uint8_t err = HAL_ADC_Start_DMA(
+            &adc_handle,
+            (uint32_t*) &dma_adc_data.samples[0],
+            ADC_SAMLES_LENGTH);
+
+    if(err != HAL_OK)
     {
         platform_error_handler();
     }
 }
 
-// called from IRQ
+// called from IRQ, DMA transfer completed
+// this is probably overkill for 2 adc samples
 static void adc_conversion_complete(void)
 {
-    // TODO
-    // - inline
-    // - enqueue a sample
-    // in task loop dequeue and filter?
+    portBASE_TYPE higher_priority_task_woken = pdFALSE;
+    adc_msg_s msg;
+
+    memcpy(
+            &msg,
+            (void*) &dma_adc_data,
+            sizeof(dma_adc_data));
+
+    (void) xQueueSendToBackFromISR(
+            adc_queue,
+            &msg,
+            &higher_priority_task_woken);
 }
 
 static void input_task(
         void * const params)
 {
+    adc_msg_s adc_msg;
     (void) params;
 
     system_wait_for_start();
@@ -183,14 +210,14 @@ static void input_task(
 
     enable_adc();
 
-    TickType_t last_wake_time = xTaskGetTickCount();
-
     while(1)
     {
-        vTaskDelayUntil(&last_wake_time, M2T(100));
-
-        debug_printf("pt0 %lu\r\n", adc_samples[0]);
-        debug_printf("pt1 %lu\r\n", adc_samples[1]);
+        // TODO - testing
+        if(xQueueReceive(adc_queue, &adc_msg, M2T(5)) == pdTRUE)
+        {
+            //debug_printf("pt0 %lu\r\n", adc_msg.samples[0]);
+            //debug_printf("pt1 %lu\r\n", adc_msg.samples[1]);
+        }
     }
 
     // should not get here
@@ -200,6 +227,12 @@ static void control_io_init(void)
 {
     if(is_init == false)
     {
+        adc_queue = xQueueCreateStatic(
+                ADC_QUEUE_LENGTH,
+                ADC_MSG_SIZE,
+                &adc_queue_storage[0],
+                &adc_queue_handle);
+
         (void) xTaskCreateStatic(
                 &input_task,
                 CONTROL_IO_INPUT_TASK_NAME,
@@ -218,10 +251,8 @@ void control_io_start(void)
     control_io_init();
 }
 
-// these are STM HAL related
 void ADC_DMA_IRQHandler(void)
 {
-    //HAL_DMA_IRQHandler(&dma_handle);
     HAL_DMA_IRQHandler(adc_handle.DMA_Handle);
 }
 
@@ -230,6 +261,7 @@ void ADC_IRQHandler(void)
     HAL_ADC_IRQHandler(&adc_handle);
 }
 
+// these are STM HAL related
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *handle)
 {
     (void) handle;

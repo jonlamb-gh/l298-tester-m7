@@ -4,6 +4,7 @@ l298-tester running on STM32F7
 ## TODO
 
 - implement HAL MSP init/deinit functions for ADC/TIM/PWM, etc
+- error handling, assertions
 
 ## Debugging
 
