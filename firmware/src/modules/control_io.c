@@ -21,6 +21,7 @@
 #define ADC_SAMLES_LENGTH (2)
 #define ADC_QUEUE_LENGTH (64)
 #define ADC_MSG_SIZE (sizeof(adc_msg_s))
+#define FILTER_SHIFT (8)
 
 // PC0/ADC123_IN10 on CN9 pin 3
 #define PT0_ADC_CHANNEL_PIN GPIO_PIN_0
@@ -45,6 +46,13 @@ typedef struct
     uint32_t samples[ADC_SAMLES_LENGTH];
 } adc_msg_s;
 
+typedef struct
+{
+    adc_msg_s msg;
+    adc_msg_s prev_msg;
+    int32_t f_state[ADC_SAMLES_LENGTH];
+} dma_data_s;
+
 static StaticTask_t input_task_tcb;
 static StackType_t input_task_stack[CONTROL_IO_INPUT_TASK_STACKSIZE];
 
@@ -55,7 +63,7 @@ static StaticQueue_t adc_queue_handle;
 static uint8_t adc_queue_storage[ADC_QUEUE_LENGTH * ADC_MSG_SIZE];
 static QueueHandle_t adc_queue;
 
-static volatile adc_msg_s dma_adc_data;
+static volatile dma_data_s dma_adc_data;
 
 static bool is_init = false;
 
@@ -161,9 +169,14 @@ static void init_adc(void)
 
 static void enable_adc(void)
 {
+    memset(
+            (void*) &dma_adc_data,
+            0,
+            sizeof(dma_adc_data));
+
     const uint8_t err = HAL_ADC_Start_DMA(
             &adc_handle,
-            (uint32_t*) &dma_adc_data.samples[0],
+            (uint32_t*) &dma_adc_data.msg.samples[0],
             ADC_SAMLES_LENGTH);
 
     if(err != HAL_OK)
@@ -177,17 +190,38 @@ static void enable_adc(void)
 static void adc_conversion_complete(void)
 {
     portBASE_TYPE higher_priority_task_woken = pdFALSE;
-    adc_msg_s msg;
+
+    uint8_t idx;
+    for(idx = 0; idx < ADC_SAMLES_LENGTH; idx += 1)
+    {
+        dma_adc_data.f_state[idx] =
+                dma_adc_data.f_state[idx] -
+                (dma_adc_data.f_state[idx] >> FILTER_SHIFT) +
+                dma_adc_data.msg.samples[idx];
+
+        // overwrite
+        dma_adc_data.msg.samples[idx] =
+                (uint32_t) (dma_adc_data.f_state[idx] >> FILTER_SHIFT);
+    }
+
+    const uint8_t check_pt0 =
+            (dma_adc_data.msg.samples[0] == dma_adc_data.prev_msg.samples[0]) ? 0 : 1;
+
+    const uint8_t check_pt1 =
+            (dma_adc_data.msg.samples[1] == dma_adc_data.prev_msg.samples[1]) ? 0 : 1;
+
+    if((check_pt0 != 0) || (check_pt1 != 0))
+    {
+        (void) xQueueSendToBackFromISR(
+                adc_queue,
+                (void*) &dma_adc_data.msg,
+                &higher_priority_task_woken);
+    }
 
     memcpy(
-            &msg,
-            (void*) &dma_adc_data,
-            sizeof(dma_adc_data));
-
-    (void) xQueueSendToBackFromISR(
-            adc_queue,
-            &msg,
-            &higher_priority_task_woken);
+            (void*) &dma_adc_data.prev_msg,
+            (void*) &dma_adc_data.msg,
+            ADC_MSG_SIZE);
 }
 
 static void input_task(
@@ -215,8 +249,9 @@ static void input_task(
         // TODO - testing
         if(xQueueReceive(adc_queue, &adc_msg, M2T(5)) == pdTRUE)
         {
-            //debug_printf("pt0 %lu\r\n", adc_msg.samples[0]);
-            //debug_printf("pt1 %lu\r\n", adc_msg.samples[1]);
+            debug_printf("pt0 %lu\r\n", adc_msg.samples[0]);
+            debug_printf("pt1 %lu\r\n", adc_msg.samples[1]);
+            debug_printf("\r\n");
         }
     }
 
